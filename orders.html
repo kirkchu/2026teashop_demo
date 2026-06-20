@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>春水堂 訂單查看</title>
+  <style>
+    :root {
+      --bg: #FAF3E9;
+      --primary: #8B2635;
+      --primary-dark: #6B1C28;
+      --accent: #C47A3A;
+      --text: #3D2314;
+      --light: #E8D5B5;
+      --card: #FEFAF5;
+      --border: #D9C4A3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans TC', 'Microsoft JhengHei', Arial, sans-serif;
+      font-size: 14px;
+    }
+    header {
+      background: var(--primary);
+      color: white;
+      text-align: center;
+      padding: 14px 20px;
+    }
+    header h1 { font-size: 22px; letter-spacing: 6px; }
+    header p { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px;
+      background: var(--primary-dark);
+    }
+    nav a {
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      padding: 5px 18px;
+      border-radius: 20px;
+      font-size: 14px;
+    }
+    nav a:hover { background: rgba(255,255,255,0.15); color: white; }
+    nav a.active { background: rgba(255,255,255,0.25); color: white; }
+
+    main { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .toolbar h2 { font-size: 18px; color: var(--primary); }
+    .refresh-btn {
+      padding: 7px 18px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .refresh-btn:hover { background: var(--primary-dark); }
+
+    .stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 20px;
+      text-align: center;
+      flex: 1;
+    }
+    .stat-val { font-size: 28px; font-weight: bold; color: var(--primary); }
+    .stat-lbl { font-size: 12px; color: #888; margin-top: 2px; }
+
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead { background: var(--primary); color: white; }
+    th { padding: 10px 14px; text-align: left; font-size: 13px; font-weight: bold; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--light); font-size: 13px; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #fdf7ef; }
+    .amount { font-weight: bold; color: var(--accent); }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #aaa;
+      font-size: 15px;
+    }
+    .error-msg {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .empty {
+      text-align: center;
+      padding: 40px;
+      color: #bbb;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>春 水 堂</h1>
+    <p>班級點餐系統</p>
+  </header>
+  <nav>
+    <a href="index.html">點餐</a>
+    <a href="orders.html" class="active">查看訂單</a>
+  </nav>
+
+  <main>
+    <div class="toolbar">
+      <h2>目前訂單狀況</h2>
+      <button class="refresh-btn" onclick="loadOrders()">重新整理</button>
+    </div>
+
+    <div id="errorBox" style="display:none"></div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-val" id="statCount">—</div>
+        <div class="stat-lbl">訂單筆數</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="statTotal">—</div>
+        <div class="stat-lbl">總金額（元）</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="loading" id="loading">載入中…</div>
+      <table id="ordersTable" style="display:none">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>時間</th>
+            <th>姓名</th>
+            <th>餐點明細</th>
+            <th>金額</th>
+          </tr>
+        </thead>
+        <tbody id="ordersBody"></tbody>
+      </table>
+      <div class="empty" id="emptyMsg" style="display:none">目前尚無訂單</div>
+    </div>
+  </main>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzWJVqJREfKIqlX0-lH6Xmz4jEW2GxI2vsFblJfPAOVE60hvAkTtnuEy6NJlFiLuL/exec';
+
+async function loadOrders() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('ordersTable').style.display = 'none';
+  document.getElementById('emptyMsg').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+
+  try {
+    const res  = await fetch(SCRIPT_URL + '?action=get');
+    const json = await res.json();
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (!json.success) throw new Error(json.error || '讀取失敗');
+
+    const rows = json.data;
+    // rows[0] is header row; skip it
+    const dataRows = rows.length > 1 ? rows.slice(1) : [];
+
+    if (!dataRows.length) {
+      document.getElementById('emptyMsg').style.display = 'block';
+      document.getElementById('statCount').textContent = '0';
+      document.getElementById('statTotal').textContent = '0';
+      return;
+    }
+
+    let sumTotal = 0;
+    const tbody = document.getElementById('ordersBody');
+    tbody.innerHTML = '';
+    dataRows.forEach((row, i) => {
+      const [ts, name, items, total] = row;
+      const t = parseInt(total) || 0;
+      sumTotal += t;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${ts}</td>
+        <td><strong>${name}</strong></td>
+        <td>${items}</td>
+        <td class="amount">$${t}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('statCount').textContent = dataRows.length;
+    document.getElementById('statTotal').textContent = sumTotal;
+    document.getElementById('ordersTable').style.display = 'table';
+
+  } catch (e) {
+    document.getElementById('loading').style.display = 'none';
+    const box = document.getElementById('errorBox');
+    box.className = 'error-msg';
+    box.textContent = '無法載入訂單：' + e.message;
+    box.style.display = 'block';
+  }
+}
+
+loadOrders();
+</script>
+</body>
+</html>
